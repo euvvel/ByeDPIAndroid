@@ -1,55 +1,92 @@
 package io.github.dovecoteescapee.byedpi.services
 
-import android.content.Intent
+import android.app.Notification
 import android.net.VpnService
-import android.os.IBinder
-import androidx.annotation.CallSuper
+import android.os.ParcelFileDescriptor
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ServiceLifecycleDispatcher
 
-/**
- * Based on [androidx.lifecycle.LifecycleService]
- */
 open class LifecycleVpnService : VpnService(), LifecycleOwner {
-    @Suppress("LeakingThis")
+    
+    private val lifecycleRegistry = LifecycleRegistry(this)
     private val dispatcher = ServiceLifecycleDispatcher(this)
-
-    @CallSuper
+    
+    override val lifecycle: Lifecycle
+        get() = lifecycleRegistry
+    
     override fun onCreate() {
         dispatcher.onServicePreSuperOnCreate()
         super.onCreate()
+        lifecycleRegistry.currentState = Lifecycle.State.CREATED
     }
-
-    @CallSuper
-    override fun onBind(intent: Intent): IBinder? {
-        dispatcher.onServicePreSuperOnBind()
-        return super.onBind(intent)
-    }
-
-    @Deprecated("Deprecated in Java")
-    @CallSuper
-    override fun onStart(intent: Intent?, startId: Int) {
-        dispatcher.onServicePreSuperOnStart()
-        @Suppress("DEPRECATION")
-        super.onStart(intent, startId)
-    }
-
-    // this method is added only to annotate it with @CallSuper.
-    // In usual Service, super.onStartCommand is no-op, but in LifecycleService
-    // it results in dispatcher.onServicePreSuperOnStart() call, because
-    // super.onStartCommand calls onStart().
-    @CallSuper
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    
+    override fun onStartCommand(intent: android.content.Intent?, flags: Int, startId: Int): Int {
+        lifecycleRegistry.currentState = Lifecycle.State.STARTED
         return super.onStartCommand(intent, flags, startId)
     }
-
-    @CallSuper
+    
     override fun onDestroy() {
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         dispatcher.onServicePreSuperOnDestroy()
         super.onDestroy()
     }
-
-    override val lifecycle: Lifecycle
-        get() = dispatcher.lifecycle
+    
+    open fun onRevoke() {}
+    
+    class Builder {
+        private val builder = VpnService.Builder()
+        
+        fun setSession(name: String): Builder {
+            builder.setSession(name)
+            return this
+        }
+        
+        fun setConfigureIntent(intent: android.app.PendingIntent): Builder {
+            builder.setConfigureIntent(intent)
+            return this
+        }
+        
+        fun addAddress(address: String, prefixLength: Int): Builder {
+            builder.addAddress(address, prefixLength)
+            return this
+        }
+        
+        fun addRoute(address: String, prefixLength: Int): Builder {
+            builder.addRoute(address, prefixLength)
+            return this
+        }
+        
+        fun addDnsServer(address: String): Builder {
+            builder.addDnsServer(address)
+            return this
+        }
+        
+        fun setMetered(metered: Boolean): Builder {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                builder.setMetered(metered)
+            }
+            return this
+        }
+        
+        fun addDisallowedApplication(packageName: String): Builder {
+            builder.addDisallowedApplication(packageName)
+            return this
+        }
+        
+        fun establish(): ParcelFileDescriptor? {
+            return try {
+                builder.establish()
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+    
+    fun createBuilder(dns: String, ipv6: Boolean): Builder {
+        val builder = Builder()
+        builder.setSession("ByeDPI VPN")
+        return builder
+    }
 }
