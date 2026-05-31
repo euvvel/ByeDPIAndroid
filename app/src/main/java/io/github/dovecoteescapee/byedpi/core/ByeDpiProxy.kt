@@ -1,86 +1,98 @@
 package io.github.dovecoteescapee.byedpi.core
-import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
-import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyCmdPreferences
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+
+import android.util.Log
 
 class ByeDpiProxy {
+    
     companion object {
+        private const val TAG = "ByeDpiProxy"
+        
         init {
             System.loadLibrary("byedpi")
         }
     }
-
-    private val mutex = Mutex()
-    private var fd = -1
-
-    suspend fun startProxy(preferences: ByeDpiProxyPreferences): Int {
-        val fd = createSocket(preferences)
-        if (fd < 0) {
-            return -1 // TODO: should be error code
+    
+    private var isRunning = false
+    
+    fun startProxy(preferences: ByeDpiProxyPreferences): Int {
+        Log.d(TAG, "Starting proxy")
+        
+        if (isRunning) {
+            Log.w(TAG, "Proxy already running")
+            return -1
         }
-        return jniStartProxy(fd)
-    }
-
-    suspend fun stopProxy(): Int {
-        mutex.withLock {
-            if (fd < 0) {
-                throw IllegalStateException("Proxy is not running")
-            }
-
-            val result = jniStopProxy(fd)
+        
+        return try {
+            val result = createSocketFromPreferences(preferences)
             if (result == 0) {
-                fd = -1
+                isRunning = true
             }
-            return result
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start proxy", e)
+            -1
         }
     }
-
-    private suspend fun createSocket(preferences: ByeDpiProxyPreferences): Int =
-        mutex.withLock {
-            if (fd >= 0) {
-                throw IllegalStateException("Proxy is already running")
-            }
-
-            val fd = createSocketFromPreferences(preferences)
-            if (fd < 0) {
-                return -1
-            }
-            this.fd = fd
-            fd
+    
+    fun stopProxy() {
+        Log.d(TAG, "Stopping proxy")
+        if (isRunning) {
+            jniStopProxy()
+            isRunning = false
         }
-
-    private fun createSocketFromPreferences(preferences: ByeDpiProxyPreferences) =
+    }
+    
+    private fun createSocketFromPreferences(preferences: ByeDpiProxyPreferences): Int =
         when (preferences) {
             is ByeDpiProxyCmdPreferences -> {
-                // Command line preferences - pass the args array directly
                 jniCreateSocketWithCommandLine(preferences.toCommandLineArguments())
             }
-
+            
             is ByeDpiProxyUIPreferences -> {
-                // UI preferences - your original simple implementation
                 jniCreateSocket(
-                    ip = preferences.connectIp,
-                    port = preferences.connectPort,
-                    fakeSni = preferences.fakeSni,
-                    listenPort = preferences.listenPort
+                    preferences.ip,
+                    preferences.port,
+                    preferences.maxConnections,
+                    preferences.bufferSize,
+                    preferences.defaultTtl,
+                    preferences.customTtl,
+                    preferences.noDomain,
+                    preferences.desyncHttp,
+                    preferences.desyncHttps,
+                    preferences.desyncUdp,
+                    preferences.desyncMethod.ordinal,
+                    preferences.splitPosition,
+                    preferences.splitAtHost,
+                    preferences.fakeTtl,
+                    preferences.fakeSni,
+                    preferences.oobChar,
+                    preferences.hostMixedCase,
+                    preferences.domainMixedCase,
+                    preferences.hostRemoveSpaces,
+                    preferences.tlsRecordSplit,
+                    preferences.tlsRecordSplitPosition,
+                    preferences.tlsRecordSplitAtSni,
+                    preferences.hostsMode.ordinal,
+                    preferences.hosts,
+                    preferences.tcpFastOpen,
+                    preferences.udpFakeCount,
+                    preferences.dropSack,
+                    preferences.fakeOffset,
                 )
             }
             
             else -> {
-                throw IllegalArgumentException("Unknown preferences type: ${preferences?.javaClass?.name}")
+                throw IllegalArgumentException("Unknown preferences type: ${preferences.javaClass.name}")
             }
         }
-
-    private external fun jniCreateSocketWithCommandLine(args: Array<String>): Int
-
+    
     private external fun jniCreateSocket(
         ip: String,
         port: Int,
         maxConnections: Int,
         bufferSize: Int,
         defaultTtl: Int,
-        customTtl: Boolean,
+        customTtl: Int,
         noDomain: Boolean,
         desyncHttp: Boolean,
         desyncHttps: Boolean,
@@ -90,7 +102,7 @@ class ByeDpiProxy {
         splitAtHost: Boolean,
         fakeTtl: Int,
         fakeSni: String,
-        oobChar: Byte,
+        oobChar: Char,
         hostMixedCase: Boolean,
         domainMixedCase: Boolean,
         hostRemoveSpaces: Boolean,
@@ -98,14 +110,13 @@ class ByeDpiProxy {
         tlsRecordSplitPosition: Int,
         tlsRecordSplitAtSni: Boolean,
         hostsMode: Int,
-        hosts: String?,
+        hosts: String,
         tcpFastOpen: Boolean,
         udpFakeCount: Int,
         dropSack: Boolean,
         fakeOffset: Int,
     ): Int
-
-    private external fun jniStartProxy(fd: Int): Int
-
-    private external fun jniStopProxy(fd: Int): Int
+    
+    private external fun jniCreateSocketWithCommandLine(args: Array<String>): Int
+    private external fun jniStopProxy()
 }

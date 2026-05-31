@@ -1,4 +1,4 @@
-package anon.client.byedpi.core
+package io.github.dovecoteescapee.byedpi.core
 
 enum class DesyncMethod {
     Fake,

@@ -12,6 +12,8 @@ import io.github.dovecoteescapee.byedpi.core.ByeDpiProxy
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyPreferences
 import io.github.dovecoteescapee.byedpi.data.*
 import io.github.dovecoteescapee.byedpi.utility.*
+import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyCmdPreferences
+import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -147,8 +149,14 @@ class ByeDpiProxyService : LifecycleService() {
         Log.i(TAG, "Proxy stopped")
     }
 
-    private fun getByeDpiPreferences(): ByeDpiProxyPreferences =
-        ByeDpiProxyPreferences.fromSharedPreferences(getPreferences())
+    private fun getByeDpiPreferences(): ByeDpiProxyPreferences {
+        val prefs = getPreferences()
+        return if (prefs.getBoolean("use_ui_settings", true)) {
+            ByeDpiProxyUIPreferences.fromSharedPreferences(prefs)
+        } else {
+            ByeDpiProxyCmdPreferences.fromSharedPreferences(prefs)
+        }
+    }
 
     private fun updateStatus(newStatus: ServiceStatus) {
         Log.d(TAG, "Proxy status changed from $status to $newStatus")

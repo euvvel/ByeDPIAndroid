@@ -14,6 +14,9 @@ class ByeDpiProxyCmdPreferences(
     }
 
     override fun toCommandLineArguments(): Array<String> {
+        if (commandLine.isBlank()) {
+            return arrayOf("ciadpi")
+        }
         return commandLine.split("\\s+".toRegex()).toTypedArray()
     }
 }

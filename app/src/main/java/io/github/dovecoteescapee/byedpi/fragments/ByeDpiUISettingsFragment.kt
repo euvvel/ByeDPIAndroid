@@ -7,6 +7,8 @@ import io.github.dovecoteescapee.byedpi.R
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences.DesyncMethod.*
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences.HostsMode.*
+import io.github.dovecoteescapee.byedpi.core.DesyncMethod
+import io.github.dovecoteescapee.byedpi.core.HostsMode
 import io.github.dovecoteescapee.byedpi.utility.*
 
 class ByeDpiUISettingsFragment : PreferenceFragmentCompat() {
