@@ -12,11 +12,11 @@ import io.github.dovecoteescapee.byedpi.R
 import io.github.dovecoteescapee.byedpi.activities.MainActivity
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxy
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyPreferences
+import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyCmdPreferences
+import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
 import io.github.dovecoteescapee.byedpi.core.TProxyService
 import io.github.dovecoteescapee.byedpi.data.*
 import io.github.dovecoteescapee.byedpi.utility.*
-import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyCmdPreferences
-import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -70,6 +70,7 @@ class ByeDpiVpnService : LifecycleVpnService() {
     }
 
     override fun onRevoke() {
+        super.onRevoke()
         Log.i(TAG, "VPN revoked")
         lifecycleScope.launch { stop() }
     }
@@ -203,7 +204,8 @@ class ByeDpiVpnService : LifecycleVpnService() {
             throw e
         }
 
-        val fd = createBuilder(dns, ipv6).establish()
+        val builder = createBuilder(dns, ipv6)
+        val fd = builder.establish()
             ?: throw IllegalStateException("VPN connection failed")
 
         this.tunFd = fd
@@ -277,9 +279,9 @@ class ByeDpiVpnService : LifecycleVpnService() {
             ByeDpiVpnService::class.java,
         )
 
-    private fun createBuilder(dns: String, ipv6: Boolean): Builder {
+    override fun createBuilder(dns: String, ipv6: Boolean): Builder {
         Log.d(TAG, "DNS: $dns")
-        val builder = Builder()
+        val builder = Builder(this)
         builder.setSession("ByeDPI")
         builder.setConfigureIntent(
             PendingIntent.getActivity(
