@@ -1,6 +1,5 @@
 package io.github.dovecoteescapee.byedpi.services
 
-import android.app.Notification
 import android.app.PendingIntent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
@@ -38,11 +37,13 @@ open class LifecycleVpnService : VpnService(), LifecycleOwner {
         super.onRevoke()
     }
     
-    open fun createBuilder(dns: String, ipv6: Boolean): Builder {
-        return Builder(this)
+    open fun createBuilder(dns: String, ipv6: Boolean): VpnService.Builder {
+        val builder = Builder()
+        builder.setSession("ByeDPI")
+        return builder
     }
     
-    class Builder(private val service: VpnService) {
+    inner class Builder {
         private val builder = VpnService.Builder()
         
         fun setSession(name: String): Builder {

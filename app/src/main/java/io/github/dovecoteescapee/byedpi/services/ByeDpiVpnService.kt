@@ -1,4 +1,4 @@
-package io.github.dovecoteescapee.byedpi.services
+package src.main.java.io.github.dovecoteescapee.byedpi.services
 
 import android.app.Notification
 import android.app.PendingIntent
@@ -204,7 +204,34 @@ class ByeDpiVpnService : LifecycleVpnService() {
             throw e
         }
 
-        val builder = createBuilder(dns, ipv6)
+        val builder = Builder()
+        builder.setSession("ByeDPI")
+        builder.setConfigureIntent(
+            PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE,
+            )
+        )
+
+        builder.addAddress("10.10.10.10", 32)
+            .addRoute("0.0.0.0", 0)
+
+        if (ipv6) {
+            builder.addAddress("fd00::1", 128)
+                .addRoute("::", 0)
+        }
+
+        if (dns.isNotBlank()) {
+            builder.addDnsServer(dns)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            builder.setMetered(false)
+        }
+
+        builder.addDisallowedApplication(applicationContext.packageName)
+
         val fd = builder.establish()
             ?: throw IllegalStateException("VPN connection failed")
 
@@ -278,37 +305,4 @@ class ByeDpiVpnService : LifecycleVpnService() {
             R.string.vpn_notification_content,
             ByeDpiVpnService::class.java,
         )
-
-    override fun createBuilder(dns: String, ipv6: Boolean): Builder {
-        Log.d(TAG, "DNS: $dns")
-        val builder = Builder(this)
-        builder.setSession("ByeDPI")
-        builder.setConfigureIntent(
-            PendingIntent.getActivity(
-                this,
-                0,
-                Intent(this, MainActivity::class.java),
-                PendingIntent.FLAG_IMMUTABLE,
-            )
-        )
-
-        builder.addAddress("10.10.10.10", 32)
-            .addRoute("0.0.0.0", 0)
-
-        if (ipv6) {
-            builder.addAddress("fd00::1", 128)
-                .addRoute("::", 0)
-        }
-
-        if (dns.isNotBlank()) {
-            builder.addDnsServer(dns)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            builder.setMetered(false)
-        }
-
-        builder.addDisallowedApplication(applicationContext.packageName)
-
-        return builder
-    }
 }
