@@ -2,126 +2,114 @@ package io.github.dovecoteescapee.byedpi.fragments
 
 import android.content.SharedPreferences
 import android.os.Bundle
-import androidx.preference.*
+import androidx.preference.ListPreference
+import androidx.preference.PreferenceFragmentCompat
 import io.github.dovecoteescapee.byedpi.R
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
-import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences.DesyncMethod.*
-import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences.HostsMode.*
 import io.github.dovecoteescapee.byedpi.core.DesyncMethod
 import io.github.dovecoteescapee.byedpi.core.HostsMode
-import io.github.dovecoteescapee.byedpi.utility.*
 
 class ByeDpiUISettingsFragment : PreferenceFragmentCompat() {
 
-    private val preferenceListener =
-        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            updatePreferences()
-        }
-
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.byedpi_ui_settings, rootKey)
+        
+        setupHostsModePreference()
+        setupDesyncMethodPreference()
+        setupListeners()
+    }
 
-        setEditTextPreferenceListener("byedpi_proxy_ip") { checkIp(it) }
-        setEditTestPreferenceListenerPort("byedpi_proxy_port")
-        setEditTestPreferenceListenerInt(
-            "byedpi_max_connections",
-            1,
-            Short.MAX_VALUE.toInt()
-        )
-        setEditTestPreferenceListenerInt(
-            "byedpi_buffer_size",
-            1,
-            Int.MAX_VALUE / 4
-        )
-        setEditTestPreferenceListenerInt("byedpi_default_ttl", 0, 255)
-        setEditTestPreferenceListenerInt(
-            "byedpi_split_position",
-            Int.MIN_VALUE,
-            Int.MAX_VALUE
-        )
-        setEditTestPreferenceListenerInt("byedpi_fake_ttl", 1, 255)
-        setEditTestPreferenceListenerInt(
-            "byedpi_tlsrec_position",
-            2 * Short.MIN_VALUE,
-            2 * Short.MAX_VALUE,
-        )
+    private fun setupHostsModePreference() {
+        val hostsModePref = findPreference<ListPreference>("hosts_mode")
+        hostsModePref?.apply {
+            entries = arrayOf(
+                getString(R.string.hosts_mode_none),
+                getString(R.string.hosts_mode_blacklist),
+                getString(R.string.hosts_mode_whitelist)
+            )
+            entryValues = arrayOf(
+                HostsMode.None.name,
+                HostsMode.Blacklist.name,
+                HostsMode.Whitelist.name
+            )
+        }
+    }
 
-        findPreferenceNotNull<EditTextPreference>("byedpi_oob_data")
-            .setOnBindEditTextListener {
-                it.filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+    private fun setupDesyncMethodPreference() {
+        val desyncMethodPref = findPreference<ListPreference>("desync_method")
+        desyncMethodPref?.apply {
+            entries = arrayOf(
+                getString(R.string.desync_method_fake),
+                getString(R.string.desync_method_oob),
+                getString(R.string.desync_method_disoob)
+            )
+            entryValues = arrayOf(
+                DesyncMethod.Fake.name,
+                DesyncMethod.OOB.name,
+                DesyncMethod.DISOOB.name
+            )
+        }
+    }
+
+    private fun setupListeners() {
+        val sharedPreferences = preferenceManager.sharedPreferences
+        
+        // Hosts mode listener
+        findPreference<ListPreference>("hosts_mode")?.setOnPreferenceChangeListener { _, newValue ->
+            val hostsMode = try {
+                HostsMode.valueOf(newValue as String)
+            } catch (e: IllegalArgumentException) {
+                HostsMode.None
             }
-
-        updatePreferences()
+            
+            when (hostsMode) {
+                HostsMode.Blacklist -> {
+                    // Enable blacklist specific settings
+                    findPreference<androidx.preference.EditTextPreference>("blacklist_hosts")?.isEnabled = true
+                }
+                HostsMode.Whitelist -> {
+                    // Enable whitelist specific settings
+                    findPreference<androidx.preference.EditTextPreference>("whitelist_hosts")?.isEnabled = true
+                }
+                HostsMode.None -> {
+                    // Disable hosts settings
+                    findPreference<androidx.preference.EditTextPreference>("blacklist_hosts")?.isEnabled = false
+                    findPreference<androidx.preference.EditTextPreference>("whitelist_hosts")?.isEnabled = false
+                }
+            }
+            true
+        }
+        
+        // Desync method listener
+        findPreference<ListPreference>("desync_method")?.setOnPreferenceChangeListener { _, newValue ->
+            val desyncMethod = try {
+                DesyncMethod.valueOf(newValue as String)
+            } catch (e: IllegalArgumentException) {
+                DesyncMethod.Fake
+            }
+            
+            when (desyncMethod) {
+                DesyncMethod.Fake -> {
+                    // Show fake-specific settings
+                    findPreference<androidx.preference.EditTextPreference>("fake_sni")?.isEnabled = true
+                    findPreference<androidx.preference.EditTextPreference>("fake_ttl")?.isEnabled = true
+                }
+                DesyncMethod.OOB -> {
+                    // Show OOB-specific settings
+                    findPreference<androidx.preference.EditTextPreference>("oob_char")?.isEnabled = true
+                }
+                DesyncMethod.DISOOB -> {
+                    // Show DISOOB-specific settings
+                    findPreference<androidx.preference.EditTextPreference>("fake_sni")?.isEnabled = true
+                }
+            }
+            true
+        }
     }
 
-    override fun onResume() {
-        super.onResume()
-        sharedPreferences?.registerOnSharedPreferenceChangeListener(preferenceListener)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        sharedPreferences?.unregisterOnSharedPreferenceChangeListener(preferenceListener)
-    }
-
-    private fun updatePreferences() {
-        val desyncMethod =
-            findPreferenceNotNull<ListPreference>("byedpi_desync_method")
-                .value.let { ByeDpiProxyUIPreferences.DesyncMethod.fromName(it) }
-        val hostsMode = findPreferenceNotNull<ListPreference>("byedpi_hosts_mode")
-            .value.let { ByeDpiProxyUIPreferences.HostsMode.fromName(it) }
-
-        val hostsBlacklist = findPreferenceNotNull<EditTextPreference>("byedpi_hosts_blacklist")
-        val hostsWhitelist = findPreferenceNotNull<EditTextPreference>("byedpi_hosts_whitelist")
-        val desyncHttp = findPreferenceNotNull<CheckBoxPreference>("byedpi_desync_http")
-        val desyncHttps = findPreferenceNotNull<CheckBoxPreference>("byedpi_desync_https")
-        val desyncUdp = findPreferenceNotNull<CheckBoxPreference>("byedpi_desync_udp")
-        val splitPosition = findPreferenceNotNull<EditTextPreference>("byedpi_split_position")
-        val splitAtHost = findPreferenceNotNull<CheckBoxPreference>("byedpi_split_at_host")
-        val ttlFake = findPreferenceNotNull<EditTextPreference>("byedpi_fake_ttl")
-        val fakeSni = findPreferenceNotNull<EditTextPreference>("byedpi_fake_sni")
-        val fakeOffset = findPreferenceNotNull<EditTextPreference>("byedpi_fake_offset")
-        val oobChar = findPreferenceNotNull<EditTextPreference>("byedpi_oob_data")
-        val udpFakeCount = findPreferenceNotNull<EditTextPreference>("byedpi_udp_fake_count")
-        val hostMixedCase = findPreferenceNotNull<CheckBoxPreference>("byedpi_host_mixed_case")
-        val domainMixedCase = findPreferenceNotNull<CheckBoxPreference>("byedpi_domain_mixed_case")
-        val hostRemoveSpaces =
-            findPreferenceNotNull<CheckBoxPreference>("byedpi_host_remove_spaces")
-        val splitTlsRec = findPreferenceNotNull<CheckBoxPreference>("byedpi_tlsrec_enabled")
-        val splitTlsRecPosition =
-            findPreferenceNotNull<EditTextPreference>("byedpi_tlsrec_position")
-        val splitTlsRecAtSni = findPreferenceNotNull<CheckBoxPreference>("byedpi_tlsrec_at_sni")
-
-        hostsBlacklist.isVisible = hostsMode == Blacklist
-        hostsWhitelist.isVisible = hostsMode == Whitelist
-
-        val desyncEnabled = desyncMethod != None
-        splitPosition.isVisible = desyncEnabled
-        splitAtHost.isVisible = desyncEnabled
-
-        val isFake = desyncMethod == Fake
-        ttlFake.isVisible = isFake
-        fakeSni.isVisible = isFake
-        fakeOffset.isVisible = isFake
-
-        val isOob = desyncMethod == OOB || desyncMethod == DISOOB
-        oobChar.isVisible = isOob
-
-        val desyncAllProtocols =
-            !desyncHttp.isChecked && !desyncHttps.isChecked && !desyncUdp.isChecked
-
-        val desyncHttpEnabled = desyncAllProtocols || desyncHttp.isChecked
-        hostMixedCase.isEnabled = desyncHttpEnabled
-        domainMixedCase.isEnabled = desyncHttpEnabled
-        hostRemoveSpaces.isEnabled = desyncHttpEnabled
-
-        val desyncUdpEnabled = desyncAllProtocols || desyncUdp.isChecked
-        udpFakeCount.isEnabled = desyncUdpEnabled
-
-        val desyncHttpsEnabled = desyncAllProtocols || desyncHttps.isChecked
-        splitTlsRec.isEnabled = desyncHttpsEnabled
-        val tlsRecEnabled = desyncHttpsEnabled && splitTlsRec.isChecked
-        splitTlsRecPosition.isEnabled = tlsRecEnabled
-        splitTlsRecAtSni.isEnabled = tlsRecEnabled
+    companion object {
+        fun getPreferences(prefs: SharedPreferences): ByeDpiProxyUIPreferences {
+            return ByeDpiProxyUIPreferences.fromSharedPreferences(prefs)
+        }
     }
 }

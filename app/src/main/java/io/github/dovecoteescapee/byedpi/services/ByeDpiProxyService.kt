@@ -1,7 +1,6 @@
 package io.github.dovecoteescapee.byedpi.services
 
 import android.app.Notification
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -9,7 +8,6 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import io.github.dovecoteescapee.byedpi.R
-import io.github.dovecoteescapee.byedpi.activities.MainActivity
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxy
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyPreferences
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyCmdPreferences
