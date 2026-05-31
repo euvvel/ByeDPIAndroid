@@ -22,16 +22,6 @@ android {
         buildConfigField("String", "VERSION_NAME", "\"${versionName}\"")
     }
 
-    signingConfigs {
-        create("release") {
-            // For GitHub Actions, these will come from environment variables
-            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "debug.keystore")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("KEY_ALIAS") ?: "androiddebugkey"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -39,7 +29,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            // Don't specify signingConfig here, let it use debug signing
         }
         
         debug {

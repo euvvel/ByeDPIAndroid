@@ -1,4 +1,4 @@
-package src.main.java.io.github.dovecoteescapee.byedpi.services
+package io.github.dovecoteescapee.byedpi.services
 
 import android.app.Notification
 import android.app.PendingIntent
