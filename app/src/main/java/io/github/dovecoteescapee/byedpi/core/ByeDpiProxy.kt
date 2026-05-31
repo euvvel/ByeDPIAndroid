@@ -1,5 +1,6 @@
 package io.github.dovecoteescapee.byedpi.core
-
+import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
+import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyCmdPreferences
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -51,38 +52,24 @@ class ByeDpiProxy {
 
     private fun createSocketFromPreferences(preferences: ByeDpiProxyPreferences) =
         when (preferences) {
-            is ByeDpiProxyCmdPreferences -> jniCreateSocketWithCommandLine(preferences.args)
+            is ByeDpiProxyCmdPreferences -> {
+                // Command line preferences - pass the args array directly
+                jniCreateSocketWithCommandLine(preferences.toCommandLineArguments())
+            }
 
-            is ByeDpiProxyUIPreferences -> jniCreateSocket(
-                ip = preferences.ip,
-                port = preferences.port,
-                maxConnections = preferences.maxConnections,
-                bufferSize = preferences.bufferSize,
-                defaultTtl = preferences.defaultTtl,
-                customTtl = preferences.customTtl,
-                noDomain = preferences.noDomain,
-                desyncHttp = preferences.desyncHttp,
-                desyncHttps = preferences.desyncHttps,
-                desyncUdp = preferences.desyncUdp,
-                desyncMethod = preferences.desyncMethod.ordinal,
-                splitPosition = preferences.splitPosition,
-                splitAtHost = preferences.splitAtHost,
-                fakeTtl = preferences.fakeTtl,
-                fakeSni = preferences.fakeSni,
-                oobChar = preferences.oobChar,
-                hostMixedCase = preferences.hostMixedCase,
-                domainMixedCase = preferences.domainMixedCase,
-                hostRemoveSpaces = preferences.hostRemoveSpaces,
-                tlsRecordSplit = preferences.tlsRecordSplit,
-                tlsRecordSplitPosition = preferences.tlsRecordSplitPosition,
-                tlsRecordSplitAtSni = preferences.tlsRecordSplitAtSni,
-                hostsMode = preferences.hostsMode.ordinal,
-                hosts = preferences.hosts,
-                tcpFastOpen = preferences.tcpFastOpen,
-                udpFakeCount = preferences.udpFakeCount,
-                dropSack = preferences.dropSack,
-                fakeOffset = preferences.fakeOffset,
-            )
+            is ByeDpiProxyUIPreferences -> {
+                // UI preferences - your original simple implementation
+                jniCreateSocket(
+                    ip = preferences.connectIp,
+                    port = preferences.connectPort,
+                    fakeSni = preferences.fakeSni,
+                    listenPort = preferences.listenPort
+                )
+            }
+            
+            else -> {
+                throw IllegalArgumentException("Unknown preferences type: ${preferences?.javaClass?.name}")
+            }
         }
 
     private external fun jniCreateSocketWithCommandLine(args: Array<String>): Int
