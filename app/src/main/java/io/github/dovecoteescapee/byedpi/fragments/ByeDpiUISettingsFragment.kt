@@ -23,9 +23,9 @@ class ByeDpiUISettingsFragment : PreferenceFragmentCompat() {
         val hostsModePref = findPreference<ListPreference>("hosts_mode")
         hostsModePref?.apply {
             entries = arrayOf(
-                getString(R.string.hosts_mode_none),
-                getString(R.string.hosts_mode_blacklist),
-                getString(R.string.hosts_mode_whitelist)
+                "None",
+                "Blacklist",
+                "Whitelist"
             )
             entryValues = arrayOf(
                 HostsMode.None.name,
@@ -39,9 +39,9 @@ class ByeDpiUISettingsFragment : PreferenceFragmentCompat() {
         val desyncMethodPref = findPreference<ListPreference>("desync_method")
         desyncMethodPref?.apply {
             entries = arrayOf(
-                getString(R.string.desync_method_fake),
-                getString(R.string.desync_method_oob),
-                getString(R.string.desync_method_disoob)
+                "Fake",
+                "OOB",
+                "DISOOB"
             )
             entryValues = arrayOf(
                 DesyncMethod.Fake.name,
@@ -52,8 +52,6 @@ class ByeDpiUISettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun setupListeners() {
-        val sharedPreferences = preferenceManager.sharedPreferences
-        
         // Hosts mode listener
         findPreference<ListPreference>("hosts_mode")?.setOnPreferenceChangeListener { _, newValue ->
             val hostsMode = try {
@@ -64,15 +62,12 @@ class ByeDpiUISettingsFragment : PreferenceFragmentCompat() {
             
             when (hostsMode) {
                 HostsMode.Blacklist -> {
-                    // Enable blacklist specific settings
                     findPreference<androidx.preference.EditTextPreference>("blacklist_hosts")?.isEnabled = true
                 }
                 HostsMode.Whitelist -> {
-                    // Enable whitelist specific settings
                     findPreference<androidx.preference.EditTextPreference>("whitelist_hosts")?.isEnabled = true
                 }
                 HostsMode.None -> {
-                    // Disable hosts settings
                     findPreference<androidx.preference.EditTextPreference>("blacklist_hosts")?.isEnabled = false
                     findPreference<androidx.preference.EditTextPreference>("whitelist_hosts")?.isEnabled = false
                 }
@@ -90,16 +85,13 @@ class ByeDpiUISettingsFragment : PreferenceFragmentCompat() {
             
             when (desyncMethod) {
                 DesyncMethod.Fake -> {
-                    // Show fake-specific settings
                     findPreference<androidx.preference.EditTextPreference>("fake_sni")?.isEnabled = true
                     findPreference<androidx.preference.EditTextPreference>("fake_ttl")?.isEnabled = true
                 }
                 DesyncMethod.OOB -> {
-                    // Show OOB-specific settings
                     findPreference<androidx.preference.EditTextPreference>("oob_char")?.isEnabled = true
                 }
                 DesyncMethod.DISOOB -> {
-                    // Show DISOOB-specific settings
                     findPreference<androidx.preference.EditTextPreference>("fake_sni")?.isEnabled = true
                 }
             }

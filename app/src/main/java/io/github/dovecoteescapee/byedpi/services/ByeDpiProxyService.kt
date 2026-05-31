@@ -158,7 +158,7 @@ class ByeDpiProxyService : Service() {
                     AppStatus.Halted
                 }
             },
-            Mode.PROXY
+            Mode.Proxy
         )
         
         val intent = Intent(
