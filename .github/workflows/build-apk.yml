@@ -3,8 +3,6 @@ name: Build ByeDPI Android
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -46,8 +44,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
     
-    - name: Build Release APK
-      run: ./gradlew assembleRelease --stacktrace
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --stacktrace
     
     - name: Copy APKs to output directory
       run: |
@@ -56,16 +54,9 @@ jobs:
         echo "APKs found:"
         ls -la apk-output/
     
-    - name: Upload Release APK
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: ByeDPI-Release-APK
+        name: ByeDPI-Debug-APK
         path: apk-output/*.apk
         if-no-files-found: error
-    
-    - name: Upload AAB (if exists)
-      uses: actions/upload-artifact@v4
-      with:
-        name: ByeDPI-Release-AAB
-        path: app/build/outputs/bundle/release/*.aab
-        if-no-files-found: ignore
