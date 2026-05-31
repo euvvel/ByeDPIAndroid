@@ -1,39 +1,36 @@
 package io.github.dovecoteescapee.byedpi.services
 
 import android.app.Notification
+import android.app.PendingIntent
+import android.app.Service
 import android.content.Intent
-import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.IBinder
 import android.util.Log
-import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.lifecycleScope
 import io.github.dovecoteescapee.byedpi.R
+import io.github.dovecoteescapee.byedpi.activities.MainActivity
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxy
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyPreferences
-import io.github.dovecoteescapee.byedpi.data.*
-import io.github.dovecoteescapee.byedpi.utility.*
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyCmdPreferences
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
+import io.github.dovecoteescapee.byedpi.data.*
+import io.github.dovecoteescapee.byedpi.utility.*
+import kotlinx.coroutines.*
 
-class ByeDpiProxyService : LifecycleService() {
-    private var proxy = ByeDpiProxy()
+class ByeDpiProxyService : Service() {
+    private val byeDpiProxy = ByeDpiProxy()
     private var proxyJob: Job? = null
-    private val mutex = Mutex()
-
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    
     companion object {
         private val TAG: String = ByeDpiProxyService::class.java.simpleName
         private const val FOREGROUND_SERVICE_ID: Int = 2
-        private const val NOTIFICATION_CHANNEL_ID: String = "ByeDPI Proxy"
-
+        private const val NOTIFICATION_CHANNEL_ID: String = "ByeDPIProxy"
+        
         private var status: ServiceStatus = ServiceStatus.Disconnected
     }
-
+    
     override fun onCreate() {
         super.onCreate()
         registerNotificationChannel(
@@ -42,39 +39,36 @@ class ByeDpiProxyService : LifecycleService() {
             R.string.proxy_channel_name,
         )
     }
-
+    
+    override fun onBind(intent: Intent?): IBinder? = null
+    
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        super.onStartCommand(intent, flags, startId)
         return when (val action = intent?.action) {
             START_ACTION -> {
-                lifecycleScope.launch { start() }
+                scope.launch { start() }
                 START_STICKY
             }
-
             STOP_ACTION -> {
-                lifecycleScope.launch { stop() }
+                scope.launch { stop() }
                 START_NOT_STICKY
             }
-
             else -> {
                 Log.w(TAG, "Unknown action: $action")
                 START_NOT_STICKY
             }
         }
     }
-
+    
     private suspend fun start() {
-        Log.i(TAG, "Starting")
-
+        Log.i(TAG, "Starting proxy service")
+        
         if (status == ServiceStatus.Connected) {
             Log.w(TAG, "Proxy already connected")
             return
         }
-
+        
         try {
-            mutex.withLock {
-                startProxy()
-            }
+            startProxy()
             updateStatus(ServiceStatus.Connected)
             startForeground()
         } catch (e: Exception) {
@@ -83,72 +77,67 @@ class ByeDpiProxyService : LifecycleService() {
             stop()
         }
     }
-
+    
     private fun startForeground() {
         val notification: Notification = createNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 FOREGROUND_SERVICE_ID,
                 notification,
-                FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
             )
         } else {
             startForeground(FOREGROUND_SERVICE_ID, notification)
         }
     }
-
+    
     private suspend fun stop() {
-        Log.i(TAG, "Stopping VPN")
-
-        mutex.withLock {
+        Log.i(TAG, "Stopping proxy service")
+        
+        try {
             stopProxy()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop proxy", e)
         }
+        
         updateStatus(ServiceStatus.Disconnected)
         stopSelf()
     }
-
+    
     private suspend fun startProxy() {
         Log.i(TAG, "Starting proxy")
-
+        
         if (proxyJob != null) {
-            Log.w(TAG, "Proxy fields not null")
+            Log.w(TAG, "Proxy already running")
             throw IllegalStateException("Proxy fields not null")
         }
-
-        proxy = ByeDpiProxy()
+        
         val preferences = getByeDpiPreferences()
-
-        proxyJob = lifecycleScope.launch(Dispatchers.IO) {
-            val code = proxy.startProxy(preferences)
-
-            withContext(Dispatchers.Main) {
-                if (code != 0) {
-                    Log.e(TAG, "Proxy stopped with code $code")
-                    updateStatus(ServiceStatus.Failed)
-                } else {
-                    updateStatus(ServiceStatus.Disconnected)
-                }
+        
+        proxyJob = scope.launch {
+            val code = byeDpiProxy.startProxy(preferences)
+            
+            if (code != 0) {
+                Log.e(TAG, "Proxy stopped with code $code")
+                updateStatus(ServiceStatus.Failed)
+            } else {
+                updateStatus(ServiceStatus.Disconnected)
             }
         }
-
+        
         Log.i(TAG, "Proxy started")
     }
-
+    
     private suspend fun stopProxy() {
         Log.i(TAG, "Stopping proxy")
-
-        if (status == ServiceStatus.Disconnected) {
-            Log.w(TAG, "Proxy already disconnected")
-            return
-        }
-
-        proxy.stopProxy()
-        proxyJob?.join()
+        
+        byeDpiProxy.stopProxy()
+        proxyJob?.join() ?: throw IllegalStateException("ProxyJob field null")
         proxyJob = null
-
+        
         Log.i(TAG, "Proxy stopped")
     }
-
+    
     private fun getByeDpiPreferences(): ByeDpiProxyPreferences {
         val prefs = getPreferences()
         return if (prefs.getBoolean("use_ui_settings", true)) {
@@ -157,12 +146,11 @@ class ByeDpiProxyService : LifecycleService() {
             ByeDpiProxyCmdPreferences.fromSharedPreferences(prefs)
         }
     }
-
+    
     private fun updateStatus(newStatus: ServiceStatus) {
         Log.d(TAG, "Proxy status changed from $status to $newStatus")
-
         status = newStatus
-
+        
         setStatus(
             when (newStatus) {
                 ServiceStatus.Connected -> AppStatus.Running
@@ -172,9 +160,9 @@ class ByeDpiProxyService : LifecycleService() {
                     AppStatus.Halted
                 }
             },
-            Mode.Proxy
+            Mode.PROXY
         )
-
+        
         val intent = Intent(
             when (newStatus) {
                 ServiceStatus.Connected -> STARTED_BROADCAST
@@ -185,7 +173,7 @@ class ByeDpiProxyService : LifecycleService() {
         intent.putExtra(SENDER, Sender.Proxy.ordinal)
         sendBroadcast(intent)
     }
-
+    
     private fun createNotification(): Notification =
         createConnectionNotification(
             this,
@@ -194,4 +182,9 @@ class ByeDpiProxyService : LifecycleService() {
             R.string.proxy_notification_content,
             ByeDpiProxyService::class.java,
         )
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
+    }
 }

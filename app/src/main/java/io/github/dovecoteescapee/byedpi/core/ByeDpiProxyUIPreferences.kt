@@ -1,4 +1,4 @@
-package org.example.byedpi.core
+package io.github.dovecoteescapee.byedpi.core
 
 import android.content.SharedPreferences
 
